@@ -70,7 +70,26 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
+          # /usr/bin/pg_dump on Debian and Ubuntu is postgresql-common's
+          # pg_wrapper, which dispatches to a binary chosen from the *local
+          # cluster*, not from what is installed. The runner image ships a
+          # PostgreSQL 16 cluster, so the wrapper selects 16 even with 18
+          # installed -- and selects 18 only when connection arguments point at
+          # the 18 service. That split is what produced dumps the verification
+          # step could not read. Bypass the wrapper entirely.
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+
+      # A separate step because $GITHUB_PATH only affects later steps. Asserting
+      # here means a regression fails with one clear message rather than as a
+      # scatter of confusing test failures.
+      - name: Verify the client really is major 18
+        run: |
           pg_dump --version
+          pg_restore --version
+          pg_dump    --version | grep -Eq '^pg_dump \(PostgreSQL\) 18\.'
+          pg_restore --version | grep -Eq '^pg_restore \(PostgreSQL\) 18\.'
+          pg_dumpall --version | grep -Eq '^pg_dumpall \(PostgreSQL\) 18\.'
+          psql       --version | grep -Eq '^psql \(PostgreSQL\) 18\.'
 
       - name: Install dependencies
         run: uv sync --frozen

@@ -230,6 +230,27 @@ PGBACKUP_TEST_DB=pgbackup_integration \
   uv run pytest -m integration
 ```
 
+### A note on Debian and Ubuntu hosts
+
+The container image is Alpine-based and runs the PostgreSQL binaries directly,
+so this does not affect a normal deployment. It does affect running `pgbackup`
+from a checkout on a Debian or Ubuntu host.
+
+There, `/usr/bin/pg_dump` is not the real binary: it is `postgresql-common`'s
+`pg_wrapper`, which picks a versioned binary based on the **local cluster**
+rather than on what is installed. With a PostgreSQL 16 cluster present it
+selects 16 even when 18 is installed — and selects 18 only when connection
+arguments point at an 18 server. The result is a dump written by 18 that the
+verification step then tries to read with 16, so every good backup fails
+verification with `unsupported version (1.16) in file header`.
+
+Put the versioned directory first on `PATH` to bypass the wrapper:
+
+```sh
+export PATH=/usr/lib/postgresql/18/bin:$PATH
+pg_dump --version   # must report 18.x
+```
+
 ### Smoke-testing against real R2
 
 Local MinIO does **not** reproduce R2's rejection of the AWS SDK's default
