@@ -1,0 +1,42 @@
+version: "2"
+
+linters:
+  enable:
+    - bodyclose
+    - contextcheck
+    - errorlint
+    - gosec
+    - ineffassign
+    - noctx
+    - unconvert
+    - unparam
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gosec:
+      excludes:
+        # Subprocess launched with variable: this service exists to run pg_dump
+        # and friends, and the binaries are fixed string literals.
+        - G204
+        # File opened by a constructed path: every such path is built by this
+        # service from its own configuration, never from request input.
+        - G304
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+      # s3/manager is deprecated in favour of feature/s3/transfermanager, which
+      # is still v0.x and free to change shape. For the component that stores
+      # backups, the stable v1 API is the better trade. Revisit at 1.0.
+      - path: internal/objstore/r2\.go
+        text: "SA1019"
+        linters:
+          - staticcheck
+
+formatters:
+  enable:
+    - gofmt
