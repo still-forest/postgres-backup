@@ -26,7 +26,7 @@ def source_cfg(tmp_path: Path) -> object:
         postgres=replace(
             cfg.postgres,
             host="db.internal",
-            databases=["manor_production", "manor_analytics"],
+            databases=["app_production", "app_analytics"],
         ),
     )
 
@@ -36,7 +36,7 @@ def test_restore_requires_its_own_environment(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("POSTGRES_HOST", "db.internal")
     monkeypatch.setenv("POSTGRES_USER", "postgres")
     monkeypatch.setenv("POSTGRES_PASS", "productionpw")
-    monkeypatch.setenv("POSTGRES_DB", "manor_production")
+    monkeypatch.setenv("POSTGRES_DB", "app_production")
 
     with pytest.raises(ValueError) as excinfo:
         load_restore_target()
@@ -89,7 +89,7 @@ def test_load_restore_target_rejects_a_bad_port(monkeypatch: pytest.MonkeyPatch)
         load_restore_target()
 
 
-@pytest.mark.parametrize("database", ["manor_production", "manor_analytics"])
+@pytest.mark.parametrize("database", ["app_production", "app_analytics"])
 def test_refuses_to_restore_over_a_backed_up_database(tmp_path: Path, database: str) -> None:
     target = RestoreTarget(host="db.internal", port=5432, user="u", password="p", database=database)
 
@@ -99,7 +99,7 @@ def test_refuses_to_restore_over_a_backed_up_database(tmp_path: Path, database: 
 
 @pytest.mark.parametrize(
     ("host", "database"),
-    [("scratch.internal", "manor_production"), ("db.internal", "manor_scratch")],
+    [("scratch.internal", "app_production"), ("db.internal", "app_scratch")],
     ids=["different-host", "different-database"],
 )
 def test_permits_restore_to_a_different_target(tmp_path: Path, host: str, database: str) -> None:
@@ -110,7 +110,7 @@ def test_permits_restore_to_a_different_target(tmp_path: Path, host: str, databa
 
 def test_explicit_override_allows_a_production_restore(tmp_path: Path) -> None:
     target = RestoreTarget(
-        host="db.internal", port=5432, user="u", password="p", database="manor_production"
+        host="db.internal", port=5432, user="u", password="p", database="app_production"
     )
 
     check_not_source(target, source_cfg(tmp_path), overridden=True)  # type: ignore[arg-type]

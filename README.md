@@ -1,11 +1,15 @@
 # postgres-backup
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Daily PostgreSQL 18 backups to S3-compatible storage (Cloudflare R2), with
 verification, retention and restore.
 
-Replaces a fork of `kartoza/docker-pg-backup`, whose cron path could fail
-without producing any output at all. The guiding constraint here is that
-**no failure mode is allowed to be silent.**
+It exists because the tool it replaced stopped backing up a production database
+for a week after a credential rotation, and said nothing: its cron path could
+fail before its logging was wired up, so there were no logs, no alert and no
+non-zero exit. The guiding constraint here is therefore that **no failure mode
+is allowed to be silent** — every table and check below follows from that.
 
 ## How it avoids silent failure
 
@@ -15,8 +19,8 @@ without producing any output at all. The guiding constraint here is that
 | Preflight on boot: database query, `pg_dump` version, bucket read/write probe | Rotated or wrong credentials, unreachable database, wrong client version — at deploy time, not at 23:00 |
 | Self-scheduled in-process timer | No cron, no crontab, no marshalling the environment through a generated shell file |
 | A SIGTERM handler, not the default disposition | Python's default would kill the interpreter without unwinding, so no `finally` runs and no failure is ever reported |
-| Structured logs to stdout at every step | Ordinary container logs, one `event=` key per step; picked up by Alloy and shipped to Loki automatically |
-| `/fail` ping from a `defer` that also recovers panics | Any exit path, including a panic or SIGTERM mid-run |
+| Structured logs to stdout at every step | Ordinary container logs in logfmt, one `event=` key per step, ready for Loki/Grafana or anything else that reads stdout |
+| `/fail` ping sent from a `finally` that catches `BaseException` | Any exit path, including SIGTERM or KeyboardInterrupt mid-run |
 | Healthchecks period + grace | `SIGKILL`, OOM kill, host reboot, container that never starts — the cases no in-process code can report |
 
 That last row is not optional. Configure the Healthchecks check with a
@@ -49,8 +53,8 @@ once at startup, in either of two cases:
   crash-looped through its window from silently skipping a day, without keeping
   any local state.
 
-The default is deliberately `RUN_ON_BOOT=false`. Coolify redeploys can happen
-several times a day, and each one would otherwise dump production. The staleness
+The default is deliberately `RUN_ON_BOOT=false`. On a platform that redeploys
+on every push, each redeploy would otherwise dump production. The staleness
 check covers the case that actually matters. Turn it on if you want the
 guarantee that every deploy leaves a fresh backup behind, and are content to pay
 for a dump per deploy.
@@ -190,9 +194,9 @@ restore leaves the target untouched instead of half-written.
 ```sh
 docker run --rm --env-file prod.env \
   -e RESTORE_HOST=scratch.internal -e RESTORE_USER=postgres \
-  -e RESTORE_PASS=... -e RESTORE_DB=manor_scratch \
+  -e RESTORE_PASS=... -e RESTORE_DB=myapp_scratch \
   ghcr.io/still-forest/postgres-backup:latest \
-  restore --latest --execute --confirm-database manor_scratch
+  restore --latest --execute --confirm-database myapp_scratch
 ```
 
 ## Development
@@ -271,3 +275,18 @@ Three Python-specific hazards are load-bearing and should not be "tidied":
 - `HttpPinger` never consults `Shutdown`. The `/fail` ping sent while the
   process is being torn down is the most important one there is, and making it
   cancellation-aware would suppress exactly the alert that matters most.
+
+## Acknowledgements
+
+This service replaces a deployment of
+[kartoza/docker-pg-backup](https://github.com/kartoza/docker-pg-backup), which
+is GPL-2.0 licensed. No code from that project is used here: this is an
+independent implementation written against the observed behaviour of the tool it
+replaced, and it is licensed independently. The environment variable names are
+kept compatible so an existing deployment can be migrated without rewriting its
+configuration, and several comments describe what the previous tool did in order
+to explain why a check exists.
+
+## License
+
+[MIT](LICENSE) © 2026 John Szymanowski

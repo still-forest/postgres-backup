@@ -32,7 +32,7 @@ class Conn:
             "PGPORT": str(self.port),
             "PGUSER": self.user,
             "PGCONNECT_TIMEOUT": "10",
-            "PGAPPNAME": "manor-pgbackup",
+            "PGAPPNAME": "pgbackup",
         }
 
 

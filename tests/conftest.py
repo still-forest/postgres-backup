@@ -84,11 +84,11 @@ def valid_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "POSTGRES_HOST": "db.internal",
         "POSTGRES_USER": "postgres",
         "POSTGRES_PASS": "secret",
-        "POSTGRES_DB": "manor_production",
+        "POSTGRES_DB": "app_production",
         "ACCESS_KEY_ID": "abc123",
         "SECRET_ACCESS_KEY": "def456",
-        "BUCKET": "manor-postgres-backup",
-        "BUCKET_PATH": "manor_db",
+        "BUCKET": "example-backups",
+        "BUCKET_PATH": "backups",
         "HOST_BASE": "https://acct.r2.cloudflarestorage.com",
         "TMP_DIR": str(tmp_path),
     }.items():
@@ -102,7 +102,7 @@ def make_config(tmp_dir: Path, **overrides: object) -> Config:
             port=5432,
             user="postgres",
             password="pw",
-            databases=["manor_production"],
+            databases=["app_production"],
             compress="",
             timeout=3600.0,
         ),
@@ -110,7 +110,7 @@ def make_config(tmp_dir: Path, **overrides: object) -> Config:
             access_key_id="key",
             secret_access_key="secret",
             bucket="b",
-            bucket_path="manor_db",
+            bucket_path="backups",
             host_base="https://acct.r2.cloudflarestorage.com",
         ),
         schedule=Schedule(at="23:00", tz="UTC", run_on_boot=False, max_backup_age=26 * 3600),
@@ -159,7 +159,7 @@ def happy_path_stubs(dump_body: bytes | None = None) -> list[Stub]:
 
     def write_globals(command: Command) -> None:
         if command.stdout_path:
-            Path(command.stdout_path).write_text("CREATE ROLE manor;\n")
+            Path(command.stdout_path).write_text("CREATE ROLE app;\n")
 
     return [
         Stub(match="psql", stdout="1048576\n"),  # pg_database_size

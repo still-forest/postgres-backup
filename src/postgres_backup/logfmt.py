@@ -7,7 +7,7 @@ Output mirrors what Go's ``log/slog`` TextHandler produced, so dashboards and
 queries written against the Go build keep working:
 
     time=2026-09-17T23:00:14.123Z level=INFO msg="dumping database" \
-        event=dump.start database=manor_production
+        event=dump.start database=app_production
 """
 
 from __future__ import annotations

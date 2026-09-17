@@ -66,12 +66,12 @@ def test_tail_is_concurrency_safe() -> None:
 
 
 def test_record_renders_as_logfmt() -> None:
-    line = render(logging.INFO, "dumping database", {"event": "dump.start", "database": "manor"})
+    line = render(logging.INFO, "dumping database", {"event": "dump.start", "database": "app"})
 
     assert "level=INFO" in line
     assert 'msg="dumping database"' in line
     assert "event=dump.start" in line
-    assert "database=manor" in line
+    assert "database=app" in line
 
 
 def test_warning_is_rendered_as_warn() -> None:

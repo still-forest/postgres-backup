@@ -24,11 +24,11 @@ from .fakes import MismatchedMetaStore, StrippedMetaStore, Stub
 
 
 def dump_key() -> str:
-    return keys.build_key("manor_db", "manor_production", RUN_AT)
+    return keys.build_key("backups", "app_production", RUN_AT)
 
 
 def globals_key() -> str:
-    return keys.globals_key("manor_db", "manor_production", RUN_AT)
+    return keys.globals_key("backups", "app_production", RUN_AT)
 
 
 def boom() -> CommandError:
@@ -66,7 +66,7 @@ def test_upload_records_verification_metadata(harness: Harness) -> None:
 
     assert metadata["sha256"]
     assert metadata["toc-entries"] == "3"
-    assert metadata["database"] == "manor_production"
+    assert metadata["database"] == "app_production"
     assert metadata["pg-dump-major"] == "18"
 
 
@@ -192,13 +192,13 @@ def test_prune_failure_still_reports_the_upload_succeeded(harness: Harness) -> N
 
 def test_prune_removes_expired_backups_and_their_globals(harness: Harness) -> None:
     old = RUN_AT - timedelta(days=400)
-    old_dump = keys.build_key("manor_db", "manor_production", old)
-    old_globals = keys.globals_key("manor_db", "manor_production", old)
+    old_dump = keys.build_key("backups", "app_production", old)
+    old_globals = keys.globals_key("backups", "app_production", old)
     harness.store.seed(old_dump, 100, old)
     harness.store.seed(old_globals, 10, old)
     for days in (1, 2, 3):
         ts = RUN_AT - timedelta(days=days)
-        harness.store.seed(keys.build_key("manor_db", "manor_production", ts), 100, ts)
+        harness.store.seed(keys.build_key("backups", "app_production", ts), 100, ts)
 
     harness.runner.run_once()
 
@@ -207,7 +207,7 @@ def test_prune_removes_expired_backups_and_their_globals(harness: Harness) -> No
 
 
 def test_prune_leaves_foreign_keys_alone(harness: Harness) -> None:
-    legacy = "manor_db/2024/September/PG_manor_17-September-2024.dmp"
+    legacy = "backups/2024/September/PG_app_17-September-2024.dmp"
     harness.store.seed(legacy, 100, RUN_AT - timedelta(days=700))
 
     harness.runner.run_once()
@@ -218,7 +218,7 @@ def test_prune_leaves_foreign_keys_alone(harness: Harness) -> None:
 def test_pruning_can_be_disabled(harness: Harness) -> None:
     harness.runner.cfg = replace(harness.cfg, prune_enabled=False)
     old = RUN_AT - timedelta(days=400)
-    old_dump = keys.build_key("manor_db", "manor_production", old)
+    old_dump = keys.build_key("backups", "app_production", old)
     harness.store.seed(old_dump, 100, old)
 
     harness.runner.run_once()
@@ -298,15 +298,15 @@ def test_preflight_rejects_a_server_newer_than_the_client(harness: Harness) -> N
 
 
 def test_newest_backup_ignores_unparseable_keys(harness: Harness) -> None:
-    harness.store.seed("manor_db/manor_production/junk.dmp", 10, RUN_AT)
+    harness.store.seed("backups/app_production/junk.dmp", 10, RUN_AT)
     ts = RUN_AT - timedelta(days=2)
-    harness.store.seed(keys.build_key("manor_db", "manor_production", ts), 10, ts)
+    harness.store.seed(keys.build_key("backups", "app_production", ts), 10, ts)
 
-    assert harness.runner.newest_backup("manor_production") == ts
+    assert harness.runner.newest_backup("app_production") == ts
 
 
 def test_newest_backup_is_none_on_an_empty_bucket(harness: Harness) -> None:
-    assert harness.runner.newest_backup("manor_production") is None
+    assert harness.runner.newest_backup("app_production") is None
 
 
 def test_multiple_databases_each_produce_a_backup(tmp_path: Path, harness: Harness) -> None:
@@ -319,8 +319,8 @@ def test_multiple_databases_each_produce_a_backup(tmp_path: Path, harness: Harne
     harness.runner.run_once()
 
     stored = harness.store.stored_keys()
-    assert keys.build_key("manor_db", "db_one", RUN_AT) in stored
-    assert keys.build_key("manor_db", "db_two", RUN_AT) in stored
+    assert keys.build_key("backups", "db_one", RUN_AT) in stored
+    assert keys.build_key("backups", "db_two", RUN_AT) in stored
 
 
 def test_object_dataclass_is_hashable_for_set_operations() -> None:
@@ -335,9 +335,9 @@ def test_runner_uses_injected_clock(harness: Harness) -> None:
 def test_prune_database_standalone(harness: Harness) -> None:
     for days in range(40):
         ts = RUN_AT - timedelta(days=days)
-        harness.store.seed(keys.build_key("manor_db", "manor_production", ts), 100, ts)
+        harness.store.seed(keys.build_key("backups", "app_production", ts), 100, ts)
 
-    harness.runner.prune_database("manor_production")
+    harness.runner.prune_database("app_production")
 
     assert len(harness.store.deleted) > 0
 

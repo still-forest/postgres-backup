@@ -10,7 +10,7 @@ from postgres_backup.commands import CommandError
 from .fakes import FakeRunner, Stub
 
 
-def conn(database: str = "manor_production") -> pgtool.Conn:
+def conn(database: str = "app_production") -> pgtool.Conn:
     return pgtool.Conn(
         host="db.internal", port=5432, user="postgres", password="pw", database=database
     )
@@ -72,7 +72,7 @@ def test_dump_args() -> None:
         "--no-owner",
         "--no-privileges",
         "--file=/tmp/x.dump",
-        "--dbname=manor_production",
+        "--dbname=app_production",
     ):
         assert expected in args
     assert not any(a.startswith("--compress") for a in args), (
@@ -92,13 +92,13 @@ def test_toc_entries_counts_only_real_entries() -> None:
     listing = (
         ";\n"
         "; Archive created at 2026-09-17 23:00:14 UTC\n"
-        ";     dbname: manor_production\n"
+        ";     dbname: app_production\n"
         ";\n"
         "; Selected TOC Entries:\n"
         ";\n"
-        "215; 1259 16456 TABLE public notes manor\n"
-        "216; 1259 16462 TABLE public users manor\n"
-        "217; 1259 16468 TABLE public tasks manor\n"
+        "215; 1259 16456 TABLE public notes app\n"
+        "216; 1259 16462 TABLE public users app\n"
+        "217; 1259 16468 TABLE public tasks app\n"
     )
     runner = FakeRunner([Stub(stdout=listing)])
 

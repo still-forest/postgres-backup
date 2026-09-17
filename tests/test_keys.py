@@ -12,13 +12,13 @@ from postgres_backup.keys import build_key, globals_key, parse_key
 
 def test_build_key_round_trip() -> None:
     ts = datetime(2026, 9, 17, 23, 0, 14, tzinfo=UTC)
-    key = build_key("manor_db", "manor_production", ts)
+    key = build_key("backups", "app_production", ts)
 
-    assert key == "manor_db/manor_production/2026/09/manor_production-20260917T230014Z.dump"
+    assert key == "backups/app_production/2026/09/app_production-20260917T230014Z.dump"
 
     found = parse_key(key)
     assert found is not None
-    assert found == ("manor_production", ts)
+    assert found == ("app_production", ts)
 
 
 def test_build_key_normalises_to_utc() -> None:
@@ -41,24 +41,24 @@ def test_parse_key_handles_hyphenated_database() -> None:
     """The stamp is anchored at the end precisely so this works."""
     ts = datetime(2026, 9, 17, 23, 0, 14, tzinfo=UTC)
 
-    found = parse_key(build_key("p", "manor-prod-eu", ts))
+    found = parse_key(build_key("p", "app-prod-eu", ts))
 
-    assert found == ("manor-prod-eu", ts)
+    assert found == ("app-prod-eu", ts)
 
 
 @pytest.mark.parametrize(
     "key",
     [
         pytest.param(
-            "manor_db/2026/September/PG_manor_17-September-2026.dmp", id="old-kartoza-layout"
+            "backups/2026/September/PG_app_17-September-2026.dmp", id="old-kartoza-layout"
         ),
-        pytest.param("manor_db/db/2026/09/db-20260917T230014Z.globals.sql", id="globals-sidecar"),
-        pytest.param("manor_db/db/2026/09/db-20260917T230014Z.sql", id="wrong-extension"),
-        pytest.param("manor_db/db/2026/09/db.dump", id="missing-timestamp"),
-        pytest.param("manor_db/db/2026/09/db-20261317T230014Z.dump", id="month-13"),
-        pytest.param("manor_db/db/2026/10/db-20260917T230014Z.dump", id="path-month-disagrees"),
-        pytest.param("manor_db/db/2025/09/db-20260917T230014Z.dump", id="path-year-disagrees"),
-        pytest.param("manor_db/other/2026/09/db-20260917T230014Z.dump", id="db-name-disagrees"),
+        pytest.param("backups/db/2026/09/db-20260917T230014Z.globals.sql", id="globals-sidecar"),
+        pytest.param("backups/db/2026/09/db-20260917T230014Z.sql", id="wrong-extension"),
+        pytest.param("backups/db/2026/09/db.dump", id="missing-timestamp"),
+        pytest.param("backups/db/2026/09/db-20261317T230014Z.dump", id="month-13"),
+        pytest.param("backups/db/2026/10/db-20260917T230014Z.dump", id="path-month-disagrees"),
+        pytest.param("backups/db/2025/09/db-20260917T230014Z.dump", id="path-year-disagrees"),
+        pytest.param("backups/other/2026/09/db-20260917T230014Z.dump", id="db-name-disagrees"),
         pytest.param("", id="empty"),
     ],
 )
@@ -69,13 +69,11 @@ def test_parse_key_rejects(key: str) -> None:
 def test_globals_key() -> None:
     ts = datetime(2026, 9, 17, 23, 0, 14, tzinfo=UTC)
 
-    assert (
-        globals_key("manor_db", "db", ts) == "manor_db/db/2026/09/db-20260917T230014Z.globals.sql"
-    )
+    assert globals_key("backups", "db", ts) == "backups/db/2026/09/db-20260917T230014Z.globals.sql"
 
 
 def test_preflight_probe_key_is_deliberately_unparseable() -> None:
     """A leaked probe object must be classified unknown and kept, not pruned."""
-    probe = build_key("manor_db", ".preflight", datetime(2026, 9, 17, 23, 0, tzinfo=UTC)) + ".probe"
+    probe = build_key("backups", ".preflight", datetime(2026, 9, 17, 23, 0, tzinfo=UTC)) + ".probe"
 
     assert parse_key(probe) is None

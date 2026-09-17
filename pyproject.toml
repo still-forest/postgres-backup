@@ -3,8 +3,22 @@ name = "postgres-backup"
 version = "0.1.0"
 description = "Daily PostgreSQL backups to S3-compatible storage, with verification, retention and restore"
 readme = "README.md"
-# 3.12 is what Alpine 3.23 ships alongside postgresql18-client, which is the
-# runtime image. Nothing here may depend on a newer language feature.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "John Szymanowski" }]
+keywords = ["postgresql", "backup", "s3", "cloudflare-r2", "pg_dump"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: No Input/Output (Daemon)",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Database",
+    "Topic :: System :: Archiving :: Backup",
+]
+# The runtime image is Alpine-based and the code targets the oldest Python it
+# must run on; nothing here may depend on a newer language feature.
 requires-python = ">=3.12"
 
 dependencies = [

@@ -123,19 +123,19 @@ def test_duration_accepts_go_literals(
 
 
 def test_load_parses_multiple_databases(valid_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POSTGRES_DB", " manor_production , manor_analytics ,, ")
+    monkeypatch.setenv("POSTGRES_DB", " app_production , app_analytics ,, ")
 
     cfg, _ = load()
 
-    assert cfg.postgres.databases == ["manor_production", "manor_analytics"]
+    assert cfg.postgres.databases == ["app_production", "app_analytics"]
 
 
 def test_load_trims_bucket_path(valid_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("BUCKET_PATH", "/manor_db/")
+    monkeypatch.setenv("BUCKET_PATH", "/backups/")
 
     cfg, _ = load()
 
-    assert cfg.r2.bucket_path == "manor_db"
+    assert cfg.r2.bucket_path == "backups"
 
 
 def test_load_warns_about_legacy_vars(valid_env: None, monkeypatch: pytest.MonkeyPatch) -> None:

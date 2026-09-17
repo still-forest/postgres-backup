@@ -16,7 +16,7 @@ _STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 
 # Keys look like:
 #
-#     manor_db/manor_production/2026/09/manor_production-20260917T230014Z.dump
+#     backups/app_production/2026/09/app_production-20260917T230014Z.dump
 #
 # The timestamp is anchored to the end of the filename rather than found by
 # splitting on the first hyphen, because database names may contain hyphens.

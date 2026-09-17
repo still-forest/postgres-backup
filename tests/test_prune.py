@@ -21,7 +21,7 @@ def default_policy(**overrides: object) -> Policy:
 def at(days_ago: int) -> Object:
     """An object for a backup taken ``days_ago`` days before NOW."""
     ts = NOW - timedelta(days=days_ago)
-    return Object(key=keys.build_key("manor_db", "db", ts), size=1024, last_modified=ts)
+    return Object(key=keys.build_key("backups", "db", ts), size=1024, last_modified=ts)
 
 
 def key_set(objects: list[Object]) -> set[str]:
@@ -89,7 +89,7 @@ def test_deletes_beyond_monthly_window() -> None:
 def test_unknown_keys_are_never_deleted() -> None:
     """The bucket holds output from the tool this service replaced."""
     legacy = Object(
-        key="manor_db/2024/September/PG_manor_17-September-2024.dmp",
+        key="backups/2024/September/PG_app_17-September-2024.dmp",
         size=100,
         last_modified=NOW.replace(year=2024),
     )
