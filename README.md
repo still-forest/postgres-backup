@@ -14,6 +14,7 @@ without producing any output at all. The guiding constraint here is that
 | All configuration parsed and validated at startup | Missing or malformed settings, reported all at once, before the service starts waiting |
 | Preflight on boot: database query, `pg_dump` version, bucket read/write probe | Rotated or wrong credentials, unreachable database, wrong client version — at deploy time, not at 23:00 |
 | Self-scheduled in-process timer | No cron, no crontab, no marshalling the environment through a generated shell file |
+| A SIGTERM handler, not the default disposition | Python's default would kill the interpreter without unwinding, so no `finally` runs and no failure is ever reported |
 | Structured logs to stdout at every step | Ordinary container logs, one `event=` key per step; picked up by Alloy and shipped to Loki automatically |
 | `/fail` ping from a `defer` that also recovers panics | Any exit path, including a panic or SIGTERM mid-run |
 | Healthchecks period + grace | `SIGKILL`, OOM kill, host reboot, container that never starts — the cases no in-process code can report |
@@ -190,27 +191,83 @@ restore leaves the target untouched instead of half-written.
 docker run --rm --env-file prod.env \
   -e RESTORE_HOST=scratch.internal -e RESTORE_USER=postgres \
   -e RESTORE_PASS=... -e RESTORE_DB=manor_scratch \
-  ghcr.io/still-forest/manor-postgres-backup:production \
+  ghcr.io/still-forest/postgres-backup:latest \
   restore --latest --execute --confirm-database manor_scratch
 ```
 
 ## Development
 
-Requires Go (see `go.mod`) and Docker.
+Requires [uv](https://docs.astral.sh/uv/) and Docker.
 
 ```sh
-go test ./... -race          # unit tests; no database or bucket needed
-go vet ./...
-docker build -t manor-postgres-backup:test .
+uv sync
+uv run pytest                 # unit tests; no database or bucket needed
+uv run pytest -m integration  # needs a live PostgreSQL 18 (see below)
+uv run ruff check src tests
+uv run ruff format src tests
+uv run mypy
+docker build -t pgbackup:test .
 ```
 
-The interfaces in `internal/exec`, `internal/objstore` and `internal/schedule`
-exist so the orchestration, retention rules and schedule arithmetic can be
-tested against fakes rather than a live database, bucket or clock.
+The `CommandRunner`, `ObjectStore` and `Clock` protocols exist so the
+orchestration, retention rules and schedule arithmetic can be tested against
+fakes rather than a live database, bucket or clock. That testability is the
+point: the tool this replaces had none.
 
-To exercise it end to end against a throwaway database and a local MinIO, see
-the procedure in `test/integration`.
+For the integration suite, point it at a throwaway server:
 
-> `docker compose up postgres` from the repo root does not work: the root
-> `docker-compose.yml` still references `./services/postgres`, which no longer
-> exists. Run `docker run --rm -e POSTGRES_PASSWORD=... postgres:18` directly.
+```sh
+docker run --rm -d --name pgb -p 55433:5432 \
+  -e POSTGRES_PASSWORD=integration -e POSTGRES_DB=pgbackup_integration postgres:18
+
+PGBACKUP_TEST_HOST=localhost PGBACKUP_TEST_PORT=55433 \
+PGBACKUP_TEST_USER=postgres PGBACKUP_TEST_PASS=integration \
+PGBACKUP_TEST_DB=pgbackup_integration \
+  uv run pytest -m integration
+```
+
+### Smoke-testing against real R2
+
+Local MinIO does **not** reproduce R2's rejection of the AWS SDK's default
+multi-checksum behaviour, so the botocore configuration in `store.py` is only
+truly exercised against R2 itself. Before trusting a change there:
+
+1. Use a scratch prefix (`BUCKET_PATH=..._test`), never the production one.
+2. Back up a dump larger than 16 MiB so the multipart path actually runs —
+   single-part success does not prove multipart works.
+3. Confirm with `pgbackup list` and a `restore --latest` dry run that the
+   `sha256` metadata round-tripped.
+
+Two things there remain unverified against production R2 and should be checked
+on first deploy: that R2 preserves user metadata across a **multipart** upload
+(the upload confirmation would fail loudly if not), and that `HeadBucket`
+succeeds with a **bucket-scoped** API token rather than an account-scoped one.
+If the latter 403s, the preflight probe should fall back to
+`list_objects_v2(MaxKeys=1)`.
+
+## Notes on the port from Go
+
+This service was first written in Go. The Python port preserves the external
+contract exactly — the same environment variables, subcommands, object key
+scheme, `event=` log keys and exit codes — and equivalence was verified by
+running both builds against the same PostgreSQL and MinIO and diffing the
+results. Three deliberate differences:
+
+- **`uncompressed` object metadata was dropped.** It was always the constant
+  string `"false"` and conveyed nothing. Nothing had consumed it.
+- **`GIT_SHA` moves from a linker flag to the `PGBACKUP_GIT_SHA` environment
+  variable**, set by the Dockerfile. The `git_sha` log field is unchanged.
+- **A SIGTERM during a large multipart upload may take up to the socket timeout
+  to unwind**, because `s3transfer`'s worker threads are not interruptible the
+  way Go's context cancellation was. `read_timeout` bounds it at 60s.
+
+Three Python-specific hazards are load-bearing and should not be "tidied":
+
+- `PYTHONUNBUFFERED=1` in the Dockerfile. Python block-buffers stdout when it is
+  a pipe, which is what a container gives it; without this the final log lines
+  of a crashing run are lost.
+- The `tzdata` dependency. Alpine ships no zone database, so `BACKUP_TZ` would
+  fail to resolve without it.
+- `HttpPinger` never consults `Shutdown`. The `/fail` ping sent while the
+  process is being torn down is the most important one there is, and making it
+  cancellation-aware would suppress exactly the alert that matters most.

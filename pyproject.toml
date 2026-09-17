@@ -1,0 +1,85 @@
+[project]
+name = "postgres-backup"
+version = "0.1.0"
+description = "Daily PostgreSQL backups to S3-compatible storage, with verification, retention and restore"
+readme = "README.md"
+# 3.12 is what Alpine 3.23 ships alongside postgresql18-client, which is the
+# runtime image. Nothing here may depend on a newer language feature.
+requires-python = ">=3.12"
+
+dependencies = [
+    # >=1.40 guarantees the request_checksum_calculation /
+    # response_checksum_validation config options that Cloudflare R2 requires.
+    "boto3>=1.40",
+    # zoneinfo has no database on Alpine, so BACKUP_TZ would fail to resolve.
+    # Carrying it as a dependency keeps behaviour identical everywhere.
+    "tzdata>=2025.1",
+]
+
+[project.scripts]
+pgbackup = "postgres_backup.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "boto3-stubs[s3]>=1.40",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/postgres_backup"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Integration tests need a live PostgreSQL, so they are opt-in: `pytest -m integration`.
+addopts = "-q --strict-markers -m 'not integration'"
+markers = [
+    "integration: requires a live PostgreSQL server (deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+source = ["src/postgres_backup"]
+omit = ["*/fakes.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "UP",        # pyupgrade
+    "B",         # bugbear
+    "SIM",       # simplify
+    "RET",       # return consistency
+    "PTH",       # prefer pathlib
+    "S",         # bandit
+    "ARG",       # unused arguments
+    "TID",       # tidy imports
+    "RUF",
+]
+ignore = [
+    # This service exists to run pg_dump and friends; the binaries are literals
+    # and every path is built from its own configuration, never from input.
+    "S603", "S607",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# S108: the /tmp paths in tests are opaque strings passed to fakes; nothing is written.
+# S608: the integration suite interpolates its own literal table names into SQL.
+"tests/**" = ["S101", "S105", "S106", "S108", "S608", "ARG001", "ARG002"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src/postgres_backup"]
+warn_unreachable = true
